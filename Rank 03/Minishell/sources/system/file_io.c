@@ -1,0 +1,100 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   file_io.c                                          :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: tstevens <tstevens@student.s19.be>         +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2025/07/03 12:19:51 by tstevens          #+#    #+#             */
+/*   Updated: 2025/08/07 16:09:35 by tstevens         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
+#include "minishell.h"
+
+/* Sauvegarde les descripteurs de fichiers 
+standard (entrée/sortie) dans io via dup.*/
+static bool	backup_standard_streams(t_io_fds *io)
+{
+	bool	success;
+
+	success = true;
+	io->stdin_save = dup(STDIN_FILENO);
+	if (io->stdin_save == -1)
+		success = print_command_error("dup",
+				"stdin backup", strerror(errno), false);
+	io->stdout_save = dup(STDOUT_FILENO);
+	if (io->stdout_save == -1)
+		success = print_command_error("dup",
+				"stdout backup", strerror(errno), false);
+	return (success);
+}
+
+/*  Applique les redirections d’entrée et de 
+sortie en utilisant dup2 si les descripteurs sont valides.*/
+static bool	apply_stream_redirections(t_io_fds *io)
+{
+	bool	success;
+
+	success = true;
+	if (io->fd_in != -1)
+		if (dup2(io->fd_in, STDIN_FILENO) == -1)
+			success = print_command_error("dup2",
+					io->infile, strerror(errno), false);
+	if (io->fd_out != -1)
+		if (dup2(io->fd_out, STDOUT_FILENO) == -1)
+			success = print_command_error("dup2",
+					io->outfile, strerror(errno), false);
+	return (success);
+}
+
+/* Vérifie si les fichiers spécifiés sont bien ouverts .*/
+bool	validate_file_descriptors(t_io_fds *io)
+{
+	if (!io || (!io->infile && !io->outfile))
+		return (true);
+	if ((io->infile && io->fd_in == -1)
+		|| (io->outfile && io->fd_out == -1))
+		return (false);
+	return (true);
+}
+
+/* Combine la sauvegarde des flux standard 
+et l’application des redirections I/O.*/
+bool	setup_io_redirection(t_io_fds *io)
+{
+	bool	backup_result;
+	bool	redirect_result;
+
+	if (!io)
+		return (true);
+	backup_result = backup_standard_streams(io);
+	redirect_result = apply_stream_redirections(io);
+	return (backup_result && redirect_result);
+}
+
+/* Restaure les flux standard d’entrée/sortie 
+à partir des sauvegardes stockées dans io.*/
+bool	reset_io_redirection(t_io_fds *io)
+{
+	bool	result;
+
+	result = true;
+	if (!io)
+		return (result);
+	if (io->stdin_save != -1)
+	{
+		if (dup2(io->stdin_save, STDIN_FILENO) == -1)
+			result = false;
+		close(io->stdin_save);
+		io->stdin_save = -1;
+	}
+	if (io->stdout_save != -1)
+	{
+		if (dup2(io->stdout_save, STDOUT_FILENO) == -1)
+			result = false;
+		close(io->stdout_save);
+		io->stdout_save = -1;
+	}
+	return (result);
+}

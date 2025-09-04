@@ -1,0 +1,100 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   echo.c                                             :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: tstevens <tstevens@student.s19.be>         +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2025/07/03 12:16:38 by tstevens          #+#    #+#             */
+/*   Updated: 2025/08/07 16:31:39 by tstevens         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
+#include "minishell.h"
+
+/*Vérifie si l'argument est une option valide
+'-n' répétée pour supprimer le saut de ligne.*/
+static bool	validate_newline_option(char *argument)
+{
+	int		position;
+	bool	is_valid_flag;
+
+	is_valid_flag = false;
+	position = 0;
+	if (argument[position] != '-')
+		return (is_valid_flag);
+	position++;
+	while (argument[position] && argument[position] == 'n')
+		position++;
+	if (argument[position] == '\0')
+		is_valid_flag = true;
+	return (is_valid_flag);
+}
+
+/*Retourne l'indice du premier argument qui n'est pas une option '-n' valide.*/
+static int	skip_option_arguments(char **arguments)
+{
+	int	start_index;
+
+	start_index = 1;
+	while (arguments[start_index] && validate_newline_option
+		(arguments[start_index]))
+	{
+		start_index++;
+	}
+	return (start_index);
+}
+
+/*Indique si les options '-n'
+sont présentes pour supprimer le saut de ligne final.*/
+static bool	determine_newline_suppression(char **arguments)
+{
+	bool	suppress_newline;
+	int		check_index;
+
+	suppress_newline = false;
+	check_index = 1;
+	while (arguments[check_index] && validate_newline_option
+		(arguments[check_index]))
+	{
+		suppress_newline = true;
+		check_index++;
+	}
+	return (suppress_newline);
+}
+
+/*Affiche les arguments à partir de start_pos en séparant
+par des espaces et gère le saut de ligne final selon suppress_newline.*/
+static void	print_arguments_with_spacing(char **arguments,
+		bool suppress_newline, int start_pos)
+{
+	if (!arguments[start_pos])
+	{
+		if (!suppress_newline)
+			ft_putchar_fd('\n', STDOUT_FILENO);
+		return ;
+	}
+	while (arguments[start_pos])
+	{
+		ft_putstr_fd(arguments[start_pos], STDOUT_FILENO);
+		if (arguments[start_pos + 1])
+			ft_putchar_fd(' ', STDOUT_FILENO);
+		else if (!arguments[start_pos + 1] && !suppress_newline)
+			ft_putchar_fd('\n', STDOUT_FILENO);
+		start_pos++;
+	}
+}
+
+/*Implémente la commande echo avec prise en
+charge des options '-n' pour supprimer le saut de ligne.*/
+int	builtin_echo_command(t_data *data, char **args)
+{
+	int		argument_start;
+	bool	newline_suppressed;
+
+	(void)data;
+	newline_suppressed = determine_newline_suppression(args);
+	argument_start = skip_option_arguments(args);
+	print_arguments_with_spacing(args, newline_suppressed, argument_start);
+	return (EXIT_SUCCESS);
+}
